@@ -29,6 +29,8 @@ During the overall tour you drive the pace: `next`, `dig in`, `skip`,
 - `--level <beginner|intermediate|expert>` — depth for this session.
 - `--set-level <level>` — set and remember your level.
 - `--refresh` — re-explore the codebase from scratch.
+- `--model <haiku|sonnet|opus>` — override the model used by the exploration
+  subagents for this run.
 - `--smoke` — run a self-check that the plugin is installed correctly (no tour).
 
 ## How it works
@@ -37,6 +39,23 @@ The first run explores the codebase and caches a **curriculum** at
 `.claude/tour-map.json` (an ordered set of teaching "stops"). Later runs reuse
 it and only re-explore when the codebase has changed meaningfully, so they're
 fast. The cache is git-ignored.
+
+## Models & cost
+
+Exploration is the dominant token cost (one subagent per subsystem, run in
+parallel), so the subagents default to cheaper models rather than inheriting
+your main session model:
+
+| Phase | Default model |
+|-------|---------------|
+| Recon | Haiku |
+| Deep-dive fan-out | Sonnet |
+| Deep-dive re-drill (`/tour-dive`) | Sonnet |
+| Synthesis (curriculum assembly) | your session model |
+
+Override per run with `--model <haiku\|sonnet\|opus>`. If your environment sets
+`CLAUDE_CODE_SUBAGENT_MODEL`, that takes precedence over both the defaults and
+`--model`.
 
 ## Requirements
 

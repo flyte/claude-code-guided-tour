@@ -1,6 +1,6 @@
 ---
 description: Take an interactive guided tour that teaches you this codebase
-argument-hint: "[--level <level>] [--set-level <level>] [--refresh] [--smoke]"
+argument-hint: "[--level <level>] [--set-level <level>] [--refresh] [--model <model>] [--smoke]"
 ---
 
 You have been invoked via the `/tour` slash command.
