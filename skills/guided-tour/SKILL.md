@@ -44,9 +44,33 @@ Arguments are passed through from the command. Parse:
   (`{"schemaVersion":1,"level":"<level>","stops":[],"order":[]}`); the next
   `/tour` will build the curriculum.
 - `--refresh` → force a full rebuild (Phases 1–3) before proceeding.
+- `--model <haiku|sonnet|opus>` → override the model for ALL exploration
+  subagents this run (recon, deep-dive, re-drill). When set, pass it as the
+  `model` parameter on every Agent/Task dispatch below; it overrides each agent's
+  pinned default. Does not affect synthesis, which always runs on your session
+  model.
 
 Level controls depth: **beginner** = more framing, less jargon, smaller steps;
 **expert** = terser, assumes fluency, more cross-references.
+
+## Models (cost control)
+
+The exploration fan-out is the dominant token cost — Phase 2 runs one subagent
+per subsystem in parallel — so the subagents run on cheaper models by default,
+not whatever model your main session uses:
+
+| Phase | Agent (`subagent_type`) | Default model |
+|-------|-------------------------|---------------|
+| 1 Recon | `tour-recon` | Haiku |
+| 2 Deep-dive fan-out | `tour-deep-dive` | Sonnet |
+| 2b Re-drill (`/tour-dive`) | `tour-deep-dive` | Sonnet |
+| 3 Synthesis | none (you) | your session model |
+
+These defaults are pinned in the plugin's agent definitions (`agents/*.md`).
+`--model <tier>` overrides them for a run. Note: if the user's environment sets
+`CLAUDE_CODE_SUBAGENT_MODEL`, that env var overrides everything (including
+`--model` and the pinned defaults) — mention this only if a subagent is clearly
+not running on the expected model.
 
 ## Loading the map
 
@@ -79,13 +103,18 @@ Map path: `.claude/tour-map.json` (project-relative). Schema:
 Prompt templates:
 `${CLAUDE_PLUGIN_ROOT}/skills/guided-tour/references/subagent-prompts.md`.
 
-**Phase 1 — Recon (blocking).** Dispatch ONE `Explore` subagent with the Phase 1
-template. It returns `project`, up to 8 `subsystems`, and a candidate
-`endToEndTrace`. Tell the user you're surveying the codebase.
+**Phase 1 — Recon (blocking).** Dispatch ONE `tour-recon` subagent
+(`subagent_type: tour-recon`, pinned to Haiku) with the Phase 1 template. It
+returns `project`, up to 8 `subsystems`, and a candidate `endToEndTrace`. Tell
+the user you're surveying the codebase.
 
-**Phase 2 — Deep-dive fan-out (parallel).** Dispatch ONE subagent per subsystem
-using the Phase 2 template. **Issue ALL of these Agent tool calls in a SINGLE message so they run concurrently** — do not send them one message at a time, or
+**Phase 2 — Deep-dive fan-out (parallel).** Dispatch ONE `tour-deep-dive`
+subagent (`subagent_type: tour-deep-dive`, pinned to Sonnet) per subsystem using
+the Phase 2 template. **Issue ALL of these Agent tool calls in a SINGLE message so they run concurrently** — do not send them one message at a time, or
 you serialize the fan-out and waste time and tokens. Wait for all to settle.
+
+(If `--model` was passed, set the `model` parameter on each dispatch above to
+override the pinned default.)
 
 **Phase 3 — Synthesis (you, no subagent).** Build the curriculum:
 - One `stop` per subsystem that returned usable findings, `source: "deep-dive"`.
@@ -131,9 +160,11 @@ you serialize the fan-out and waste time and tokens. Wait for all to settle.
    - No area given → list the available subsystems and ask which.
    - Ambiguous → ask the user to disambiguate; never guess silently.
 3. **Re-drill if thin.** If the matched stop is a `stub`, or its detail is too
-   thin for a real lesson, dispatch ONE subagent with the Phase 2b re-drill
-   template, then update that stop in the map to `source: "deep-dive"` with the
-   richer findings (re-check referential integrity before writing).
+   thin for a real lesson, dispatch ONE `tour-deep-dive` subagent
+   (`subagent_type: tour-deep-dive`, Sonnet; honour `--model` if passed) with the
+   Phase 2b re-drill template, then update that stop in the map to
+   `source: "deep-dive"` with the richer findings (re-check referential integrity
+   before writing).
 4. Teach that subsystem as its own mini-lesson using the same stop structure
    (framing → call sites → worked example → gotchas → read-next), at `level`
    depth, going deeper than the overall tour would.

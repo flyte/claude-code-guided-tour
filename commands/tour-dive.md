@@ -1,6 +1,6 @@
 ---
 description: Take a deep-dive lesson into one area of this codebase
-argument-hint: "<area> [--level <level>] [--refresh]"
+argument-hint: "<area> [--level <level>] [--refresh] [--model <model>]"
 ---
 
 You have been invoked via the `/tour-dive` slash command.
