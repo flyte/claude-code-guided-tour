@@ -107,12 +107,23 @@ the metadata needed for staleness checks and level-awareness.
       "workedExample": "optional: a flow to trace within this subsystem",
       "gotchas": ["..."],
       "readNext": ["..."],
-      "dependsOn": ["other-stop-id"]   // dependency hints for ordering
+      "dependsOn": ["other-stop-id"],  // dependency hints for ordering
+      "source": "deep-dive"            // "deep-dive" | "stub" — see stub stops below
     }
   ],
-  "order": ["stop-id", "..."]     // the sequenced curriculum
+  "order": ["stop-id", "..."]     // the sequenced curriculum; every id MUST exist in stops[]
 }
 ```
+
+### Stub stops (partial-fan-out visibility)
+
+Each stop carries a `source` field: `"deep-dive"` when a Phase-2 subagent
+returned real findings for it, or `"stub"` when the subsystem was identified in
+recon but its deep-dive subagent failed or returned nothing usable. A stub stop
+holds only what recon knew (title, subsystem, rough objective) and is explicitly
+marked so the tour can say "this area wasn't fully explored yet" instead of
+presenting a hollow stop as complete. `/tour-dive <area> --refresh` (and a plain
+`/tour-dive` on a stub) targets exactly these to upgrade them to `deep-dive`.
 
 The map is internal scaffolding, not user-facing prose. Claude narrates *from*
 it; it does not paste it.
@@ -126,17 +137,32 @@ Returns a shortlist of subsystems — **capped at ~6–8** to bound cost — plu
 candidate trace. This is the table of contents before deep work begins.
 
 **Phase 2 — Deep-dive fan-out (N subagents, parallel).**
-One subagent per subsystem from Phase 1, dispatched together in a single message
-so they run concurrently. Each returns **structured findings** for its area:
-purpose, key files/call sites, local data flow, the "why" (grounded in
-code/comments/git — no speculation), and gotchas. The main agent waits for all
-to return before proceeding.
+One subagent per subsystem from Phase 1. **All N Agent tool calls MUST be issued
+in a single assistant message** so they run concurrently — this parallelism is
+load-bearing for latency and cost, and SKILL.md must state it explicitly (with a
+worked dispatch example) so a future author does not accidentally serialize the
+fan-out into N sequential messages. Each returns **structured findings** for its
+area: purpose, key files/call sites, local data flow, the "why," and gotchas.
+
+**Evidence grounding is enforced via explicit tooling, not aspiration.** Each
+deep-dive subagent prompt instructs the subagent to back every "why" / rationale
+claim with concrete git evidence — `git log --follow <file>`, `git blame`, and
+`git log -S <symbol>` (pickaxe) to find when/why code was introduced — and to
+quote the comment, commit message, or code it relied on. If no evidence exists,
+the subagent says "rationale unknown" rather than inventing one.
+
+A subagent that fails or returns nothing usable yields a **stub stop** (see map
+schema) rather than blocking synthesis. The main agent waits for all dispatched
+subagents to settle before proceeding.
 
 **Phase 3 — Synthesis (main agent, no subagent).**
 Collapse findings into the curriculum: order the stops (orientation →
 architecture → end-to-end trace → subsystems, central/simple first), write each
-stop's objective, framing, and read-next, record dependency hints, and persist
-`.claude/tour-map.json` with the current git sha and file count.
+stop's objective, framing, and read-next, record dependency hints, mark each
+stop's `source` (`deep-dive` or `stub`), and persist `.claude/tour-map.json` with
+the current git sha and file count. **Before writing, ensure referential
+integrity:** every id in `order[]` (and in any `dependsOn[]`) must exist in
+`stops[]`.
 
 ## Commands
 
@@ -198,13 +224,25 @@ Parsed by the skill (passed through from the commands):
 
 Inline in the skill (lightweight):
 
-- On load, get git HEAD sha (`git rev-parse HEAD`) and the tracked-file count
-  (`git ls-files | wc -l`).
-- Compare against the map's `builtAtSha` / `builtFileCount`.
-- Rebuild when the sha differs **and** drift exceeds a threshold (e.g. more than
-  ~15% of files changed, or the sha is unreachable), or when `--refresh` is
-  passed. A small drift reuses the existing map — teaching tolerates mild
-  staleness better than grading does.
+- **Integrity check first.** Before trusting a loaded map, validate it with a
+  single `jq` one-liner, e.g.
+  `jq -e 'has("schemaVersion") and has("stops") and has("order")' .claude/tour-map.json`.
+  If `jq` fails (truncated/corrupt write, e.g. a context limit hit mid-synthesis)
+  or `schemaVersion` is unexpected, treat the map as **missing** and rebuild. This
+  cheaply guards against partial writes without needing a CLI/validator.
+- **Staleness check.** Get git HEAD sha (`git rev-parse HEAD`) and the
+  tracked-file count (`git ls-files | wc -l`); compare against the map's
+  `builtAtSha` / `builtFileCount`. Rebuild when the sha differs **and** drift
+  exceeds a threshold (e.g. more than ~15% of files changed, or the sha is
+  unreachable), or when `--refresh` is passed. A small drift reuses the existing
+  map — teaching tolerates mild staleness better than grading does.
+- **Lazy rename detection** (handles refactors that rename files without changing
+  count, which the drift heuristic alone would miss): do **not** stat every
+  `keyFiles` path on load. Instead, when a stop is actually reached during the
+  tour, verify its `keyFiles[].path` still exist; if a path is gone, flag that
+  stop stale and offer to re-drill it (`/tour-dive <area> --refresh`) rather than
+  teaching from dangling anchors. This keeps the per-load cost at two git
+  commands while still catching renames where it matters.
 - If the directory is not a git repo, skip staleness entirely and build once per
   session (note this to the user).
 
@@ -223,9 +261,11 @@ Inline in the skill (lightweight):
 - **Empty / tiny repo:** if recon finds too little to teach, say so plainly and
   offer to tour whatever exists rather than fabricating subsystems.
 - **Subagent failure in fan-out:** proceed with the subsystems that returned;
-  note which areas are missing and offer `/tour-dive <area> --refresh` to fill
-  gaps later.
-- **Unparseable / corrupt map:** treat as missing and rebuild.
+  record failed areas as **stub stops** (`source: "stub"`) so they are visibly
+  incomplete rather than silently hollow, and offer `/tour-dive <area> --refresh`
+  to upgrade them later.
+- **Unparseable / corrupt map:** caught by the `jq` integrity check on load;
+  treat as missing and rebuild.
 - **Ambiguous `/tour-dive` area:** ask to disambiguate; never guess silently.
 - **No git:** see Staleness above.
 
