@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "builtAtSha": "0000000000000000000000000000000000000000",
+  "builtFileCount": 3,
+  "level": "intermediate",
+  "project": {
+    "summary": "Sample project for fixture testing.",
+    "languages": ["markdown"],
+    "buildSystem": "none",
+    "entryPoints": ["README.md"]
+  },
+  "endToEndTrace": {
+    "name": "sample flow",
+    "steps": [{ "description": "start", "file": "README.md", "symbol": "n/a" }]
+  },
+  "stops": [
+    {
+      "id": "overview",
+      "title": "Overview",
+      "subsystem": "root",
+      "objective": "Understand the sample.",
+      "framing": "Think of this as a fixture.",
+      "keyFiles": [{ "path": "README.md", "role": "entry" }],
+      "callSites": [],
+      "workedExample": "",
+      "gotchas": [],
+      "readNext": [],
+      "dependsOn": [],
+      "source": "deep-dive"
+    }
+  ],
+  "order": ["overview"]
+}
