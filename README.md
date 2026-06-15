@@ -29,6 +29,7 @@ During the overall tour you drive the pace: `next`, `dig in`, `skip`,
 - `--level <beginner|intermediate|expert>` — depth for this session.
 - `--set-level <level>` — set and remember your level.
 - `--refresh` — re-explore the codebase from scratch.
+- `--smoke` — run a self-check that the plugin is installed correctly (no tour).
 
 ## How it works
 

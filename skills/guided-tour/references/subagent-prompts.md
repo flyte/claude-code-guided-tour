@@ -58,9 +58,26 @@ briefly — the orchestrator will record it as a stub.
 
 ## Phase 2b — Re-drill (1 subagent, used by `/tour-dive` on a thin/stub stop)
 
+Standalone prompt — fill `<name>`, `<representativePaths>`, and
+`<existingFindings>` (whatever the stub stop already holds, or "none") before
+dispatch. Do NOT reference Phase 2; this prompt stands on its own.
+
 ```
-Use the Phase 2 deep-dive prompt above for subsystem <name>, but go DEEPER than
-an overview: trace the workedExample step by step with exact symbols, expand
-callSites, and surface non-obvious gotchas. The reader has already had the
-high-level tour and now wants real depth.
+You are deeply studying ONE subsystem of a codebase to teach a newcomer who has
+already seen the high-level tour and now wants real depth.
+Subsystem: <name>
+Representative paths: <representativePaths>
+Prior findings to build on (may be sparse): <existingFindings>
+
+Return the same structured findings as a deep-dive — purpose, keyFiles
+[{ path, role }], callSites [{ path, symbol, note }], dataFlow, workedExample,
+gotchas, why — but go DEEPER: trace the workedExample step by step with exact
+symbols, expand callSites beyond definitions to real usage patterns, and surface
+non-obvious gotchas.
+
+EVIDENCE RULE — every "why" / rationale claim MUST be backed by concrete
+evidence: `git log --follow <file>`, `git log -S "<symbol>" -- <path>` (pickaxe),
+`git blame -L <range> <file>`, or a direct quote from a code comment / commit
+message / doc. If you cannot find evidence, write "rationale unknown" — do NOT
+invent one.
 ```

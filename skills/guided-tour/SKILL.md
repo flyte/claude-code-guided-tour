@@ -39,7 +39,10 @@ Arguments are passed through from the command. Parse:
 - `--level <beginner|intermediate|expert>` → session-only depth override; do NOT
   persist.
 - `--set-level <level>` → write `level` into the map, confirm the update to the
-  user, then stop (do not run a tour). Build the map first if none exists.
+  user, then stop (do not run a tour). If no map exists yet, do NOT trigger a
+  full exploration just to store a preference — write a minimal valid map
+  (`{"schemaVersion":1,"level":"<level>","stops":[],"order":[]}`); the next
+  `/tour` will build the curriculum.
 - `--refresh` → force a full rebuild (Phases 1–3) before proceeding.
 
 Level controls depth: **beginner** = more framing, less jargon, smaller steps;
@@ -59,13 +62,17 @@ Map path: `.claude/tour-map.json` (project-relative). Schema:
 2. **Staleness check** (only if integrity passed and not `--refresh`):
    - `git rev-parse HEAD` → current sha; `git ls-files | wc -l` → current count.
    - Compare to the map's `builtAtSha` / `builtFileCount`.
-   - **Rebuild** when the sha differs AND file-count drift exceeds ~15%.
-     Otherwise reuse the map — teaching tolerates mild staleness. (A failed
-     `git rev-parse` means this isn't a git repo — handled by the next bullet.)
+   - **Rebuild** when the sha differs AND file-count drift exceeds ~15%; also
+     rebuild if the stored `builtAtSha` is no longer in the repo
+     (`git cat-file -e <builtAtSha>` exits non-zero — e.g. after a force-push or
+     rebase). Otherwise reuse the map — teaching tolerates mild staleness. (A
+     failed `git rev-parse` means this isn't a git repo — handled by the next
+     bullet.)
    - If this is **not a git repo** (`git rev-parse` fails), skip staleness, note
      to the user that staleness can't be tracked, and reuse any existing map or
      build once.
-3. If the map is missing/corrupt/stale/`--refresh` → **build it** (Phases 1–3).
+3. If the map is missing/corrupt/stale/empty (`stops` is empty)/`--refresh` →
+   **build it** (Phases 1–3).
 
 ## Building the map — three-phase fan-out
 
