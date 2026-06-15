@@ -38,8 +38,8 @@ Arguments are passed through from the command. Parse:
 - Bare positional (deep dive only) → the target area.
 - `--level <beginner|intermediate|expert>` → session-only depth override; do NOT
   persist.
-- `--set-level <level>` → write `level` into the map and exit (rebuild only if no
-  map exists).
+- `--set-level <level>` → write `level` into the map, confirm the update to the
+  user, then stop (do not run a tour). Build the map first if none exists.
 - `--refresh` → force a full rebuild (Phases 1–3) before proceeding.
 
 Level controls depth: **beginner** = more framing, less jargon, smaller steps;
@@ -59,8 +59,9 @@ Map path: `.claude/tour-map.json` (project-relative). Schema:
 2. **Staleness check** (only if integrity passed and not `--refresh`):
    - `git rev-parse HEAD` → current sha; `git ls-files | wc -l` → current count.
    - Compare to the map's `builtAtSha` / `builtFileCount`.
-   - **Rebuild** when the sha differs AND file-count drift exceeds ~15% (or HEAD
-     is unreachable). Otherwise reuse the map — teaching tolerates mild staleness.
+   - **Rebuild** when the sha differs AND file-count drift exceeds ~15%.
+     Otherwise reuse the map — teaching tolerates mild staleness. (A failed
+     `git rev-parse` means this isn't a git repo — handled by the next bullet.)
    - If this is **not a git repo** (`git rev-parse` fails), skip staleness, note
      to the user that staleness can't be tracked, and reuse any existing map or
      build once.
@@ -143,9 +144,12 @@ you serialize the fan-out and waste time and tokens. Wait for all to settle.
 ## Smoke test (`--smoke`)
 
 If invoked with `--smoke`, do NOT run a tour. Instead self-check and report:
-- `${CLAUDE_PLUGIN_ROOT}` resolves and the two reference files exist.
+- `${CLAUDE_PLUGIN_ROOT}` resolves and both reference docs exist:
+  `${CLAUDE_PLUGIN_ROOT}/skills/guided-tour/references/map-schema.md` and
+  `${CLAUDE_PLUGIN_ROOT}/skills/guided-tour/references/subagent-prompts.md`.
 - `jq` and `git` are available (`jq --version`, `git --version`).
 - The integrity one-liner returns `true` on
-  `references/fixtures/map-valid.json` and non-zero on
-  `references/fixtures/map-truncated.json`.
+  `${CLAUDE_PLUGIN_ROOT}/skills/guided-tour/references/fixtures/map-valid.json`
+  and non-zero on
+  `${CLAUDE_PLUGIN_ROOT}/skills/guided-tour/references/fixtures/map-truncated.json`.
 Report each as pass/fail and stop.
