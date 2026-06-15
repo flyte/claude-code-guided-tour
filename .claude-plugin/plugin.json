@@ -1,0 +1,11 @@
+{
+  "name": "claude-code-guided-tour",
+  "version": "0.1.0",
+  "description": "Teach yourself (or an agent) an unfamiliar codebase via an interactive, subagent-explored guided tour. Partner to claude-code-quiz-master.",
+  "author": {
+    "name": "flyte",
+    "email": "claude-code-guided-tour@failcode.co.uk"
+  },
+  "homepage": "https://github.com/flyte/claude-code-guided-tour",
+  "license": "MIT"
+}
